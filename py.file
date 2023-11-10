@@ -1,0 +1,176 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Nov  8 17:47:05 2023
+
+@author: user
+"""
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load the dataset
+
+data = pd.read_csv("C:\\Users\\user\\Downloads\\y\\Salary.csv")
+data.head()
+
+# line chart 
+
+def plot_interpolated_line_chart_for_top_job_titles(df, title_col, exp_col, salary_col, top_n=5, color_palette=None):
+    """
+    Interpolates missing years of experience and plots a line chart for the top N job titles based on occurrence.
+    
+    :param df: The dataframe with the salary data.
+    :param title_col: The column name in the dataframe with the job titles.
+    :param exp_col: The column name in the dataframe with the years of experience.
+    :param salary_col: The column name in the dataframe with the salary data.
+    :param top_n: The number of top job titles to consider.
+    :param color_palette: List of colors for the lines. If None, a default color map is used.
+    """
+    # Determine the top N job titles
+    top_job_titles = df[title_col].value_counts().head(top_n).index.tolist()
+    
+    # Filter the dataframe for top job titles
+    top_df = df[df[title_col].isin(top_job_titles)]
+    
+    # Interpolate the missing salary data for these job titles
+    interpolated_dfs = []
+    for title in top_job_titles:
+        # Filter data for the given job title
+        title_data = top_df[top_df[title_col] == title]
+        # Create a new dataframe with a continuous range of years of experience
+        full_range_years = pd.DataFrame({exp_col: np.arange(title_data[exp_col].min(), title_data[exp_col].max() + 1, 0.5)})
+        # Merge the full range with the existing data and interpolate missing values
+        title_data_full = full_range_years.merge(title_data, on=exp_col, how='left')
+        title_data_full[salary_col] = title_data_full[salary_col].interpolate(method='linear')
+        # Fill the job title for the interpolated data
+        title_data_full[title_col] = title
+        interpolated_dfs.append(title_data_full)
+    
+    # Combine all interpolated data for top job titles
+    interpolated_data = pd.concat(interpolated_dfs)
+    
+    # Plotting the line chart
+    # Group the data by the 'title_col' and calculate the mean for each group
+    grouped_data = interpolated_data.groupby([title_col, exp_col])[salary_col].mean().unstack(title_col)
+    
+    # If a custom color palette is provided, use it; otherwise, use a default color map.
+    if color_palette is None:
+        color_palette = plt.cm.tab10(np.linspace(0, 1, top_n))
+    
+    # Plotting each group as a new line on the chart
+    fig, ax = plt.subplots(figsize = (10,8))
+    for (name, data), color in zip(grouped_data.items(), color_palette):
+        data.plot(ax=ax, label=name, color=color)
+    
+    # Adding labels and a legend
+    plt.title(f'Interpolated Average Salary for Top {top_n} Job Titles by Years of Experience')
+    plt.xlabel('Years of Experience')
+    plt.ylabel('Average Salary ($)')
+    plt.legend(title='Job Title')
+    plt.grid(True)
+    plt.show()
+
+# Define a clear and distinct color palette for the top job titles
+distinct_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
+
+# Use the function to plot the chart for the salary data
+plot_interpolated_line_chart_for_top_job_titles(
+    df=data,
+    title_col='Job Title',
+    exp_col='Years of Experience',
+    salary_col='Salary',
+    top_n=5,
+    color_palette=distinct_colors
+)
+
+# Bar chart
+
+# Define the function for a bar chart with a legend
+def plot_bar_chart_with_legend(dataframe, x_col, y_col, title='Bar Chart', xlabel='X-Axis', ylabel='Y-Axis', color_map='tab20', top_n=5):
+    """
+    This function creates a bar chart for the top N values of the specified x and y columns of a dataframe with a legend.
+    
+    :param dataframe: Pandas DataFrame containing the data.
+    :param x_col: String, the name of the column to be used on the x-axis.
+    :param y_col: String, the name of the column to be used on the y-axis.
+    :param title: String, the title of the bar chart.
+    :param xlabel: String, the label for the x-axis.
+    :param ylabel: String, the label for the y-axis.
+    :param color_map: String or Colormap, the mapping of colors to use for each bar.
+    :param top_n: Integer, the number of top values to consider.
+    """
+    # Sort the data by the 'y_col' in descending order and take the top N values
+    top_data = dataframe.nlargest(top_n, y_col)
+    
+    # Get a nice color map from matplotlib, one color for each bar.
+    colors = plt.get_cmap(color_map)(np.linspace(0, 1, top_data.shape[0]))
+    
+    # Bar chart time! Let's plot 'x_col' on the x-axis and 'y_col' on the y-axis.
+    plt.figure(figsize=(10, 6))
+    bars = plt.barh(top_data[x_col], top_data[y_col], color=colors)
+    
+    # Create a legend by using a color map to map colors to the top N values
+    color_legend = [plt.Rectangle((0,0),1,1, color=plt.get_cmap(color_map)(i)) for i in range(top_data.shape[0])]
+    plt.legend(color_legend, top_data[x_col], title=x_col)
+    
+    # And of course, let's not forget to add some labels and a title. It's like accessorizing your outfit!
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.grid(axis='x', linestyle='--', alpha=0.7)
+    
+    # It's time to unveil the graph to the world.
+    plt.show()
+
+# Example usage of the function with the salary data
+# We'll use 'Job Title' as x_col and display only the top 5 job titles with the highest average salary
+plot_bar_chart_with_legend(
+    dataframe=data,  # using the salary_data
+    x_col='Job Title',
+    y_col='Salary',
+    title='Top 5 Job Titles with Highest Average Salary',
+    xlabel='Average Salary ($)',
+    ylabel='Job Title',
+    color_map='Set3',  # Using a color map that provides distinct colors
+    top_n=5  # Display only the top 5 bars
+)
+
+# pie chart
+
+# Define the function for a pie chart
+def plot_pie_chart(dataframe, column, title='Pie Chart', color_map='Pastel1'):
+    """
+    This function creates a pie chart for the specified column of a dataframe.
+    
+    :param dataframe: Pandas DataFrame containing the data.
+    :param column: String, the name of the categorical column to plot the pie chart for.
+    :param title: String, the title of the pie chart.
+    :param color_map: String or Colormap, the mapping of colors to use for each slice of the pie.
+    """
+    # Let's count the number of occurrences for each category in the column
+    counts = dataframe[column].value_counts()
+    
+    # We'll grab some delightful colors from a colormap
+    colors = plt.get_cmap(color_map)(np.arange(counts.size))
+    
+    # Time to plot the pie chart. Everyone loves pie!
+    plt.figure(figsize=(8, 8))
+    plt.pie(counts, labels=counts.index, autopct='%1.1f%%', colors=colors, startangle=140)
+    
+    # A title is like the cherry on top of the pie. Let's add it!
+    plt.title(title)
+    
+    # Let's present this delicious pie chart to the world.
+    plt.show()
+
+# Example usage of the function
+# We'll show the proportion of employees from different countries.
+plot_pie_chart(
+    dataframe=data,
+    column='Country',
+    title='Employee Distribution by Country',
+    color_map='Set3'  # A color palette as diverse as our dataset's countries.
+)
+
+
